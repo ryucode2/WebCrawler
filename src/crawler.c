@@ -50,7 +50,7 @@ char *fetch_url(const char *url) {
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
 
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(curl, CURLOPT_USERAGENT, "Simple-C-Crawler/1.0");
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "C-WebCrawler/1.0");
 
   CURLcode result = curl_easy_perform(curl);
 
@@ -91,30 +91,46 @@ int check_url(const char *url) {
   return response >= 200 && response < 400;
 }
 
-int should_crawl(const char *url) {
-  const char *blocked[] = {"/admin", "/login", "/private", "/backup"};
+int valid_url(const char *url) {
+  if (strncmp(url, "http://", 7) == 0)
+    return 1;
 
-  int blocked_count = sizeof(blocked) / sizeof(blocked[0]);
+  if (strncmp(url, "https://", 8) == 0)
+    return 1;
 
-  for (int i = 0; i < blocked_count; i++) {
-    if (strstr(url, blocked[i]))
-      return 0;
-  }
+  return 0;
+}
 
-  const char *ignored[] = {".css",  ".js",  ".png", ".jpg",
-                           ".jpeg", ".gif", ".svg", ".mp4"};
+int same_domain(const char *url, const char *domain) {
+  return strstr(url, domain) != NULL;
+}
 
-  int ignored_count = sizeof(ignored) / sizeof(ignored[0]);
+int should_crawl(const char *url, const char *domain) {
+  if (!valid_url(url))
+    return 0;
 
-  for (int i = 0; i < ignored_count; i++) {
+  if (strchr(url, '#'))
+    return 0;
+
+  const char *ignored[] = {".css",  ".js",  ".png",  ".jpg",  ".jpeg",
+                           ".gif",  ".svg", ".ico",  ".woff", ".woff2",
+                           ".webp", ".map", ".json", ".mp4"};
+
+  int count = sizeof(ignored) / sizeof(ignored[0]);
+
+  for (int i = 0; i < count; i++) {
     if (strstr(url, ignored[i]))
       return 0;
   }
 
+  if (!same_domain(url, domain))
+    return 0;
+
   return 1;
 }
 
-void extract_links(char *html, Queue *queue, Graph *graph, int current) {
+void extract_links(char *html, Queue *queue, Graph *graph, int current,
+                   char *domain) {
   char *pos = html;
 
   while ((pos = strstr(pos, "href=\"")) != NULL) {
@@ -135,24 +151,17 @@ void extract_links(char *html, Queue *queue, Graph *graph, int current) {
     strncpy(link, pos, length);
     link[length] = '\0';
 
-    if (!should_crawl(link)) {
-      printf("Skipped: %s\n", link);
+    if (!should_crawl(link, domain)) {
       free(link);
       pos = end;
       continue;
     }
 
-    printf("Checking: %s\n", link);
-
     if (check_url(link)) {
-      printf("Valid: %s\n", link);
-
       graph_add_edge(graph, current, link);
 
       enqueue(queue, link);
     } else {
-      printf("Broken: %s\n", link);
-
       free(link);
     }
 

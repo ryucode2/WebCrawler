@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "files.h"
 #include "graph.h"
 #include "queue.h"
 #include "robots.h"
@@ -9,14 +10,13 @@
 
 char *fetch_url(const char *url);
 
-void extract_links(char *html, Queue *queue, Graph *graph, int current);
-
-int check_url(const char *url);
+void extract_links(char *html, Queue *queue, Graph *graph, int current,
+                   char *domain);
 
 char *copy_string(const char *src) {
   char *dest = malloc(strlen(src) + 1);
 
-  if (dest == NULL)
+  if (!dest)
     return NULL;
 
   strcpy(dest, src);
@@ -42,12 +42,18 @@ int main(int argc, char **argv) {
 
   robots_load(&robots, "robots.txt");
 
+  printf("\n========== FILE SCAN ==========\n");
+
+  scan_files(argv[1]);
+
+  char domain[256];
+
+  strcpy(domain, argv[1]);
+
   char *start_url = copy_string(argv[1]);
 
-  if (start_url == NULL) {
-    printf("memory allocation failed\n");
+  if (!start_url)
     return 1;
-  }
 
   enqueue(&queue, start_url);
 
@@ -60,25 +66,22 @@ int main(int argc, char **argv) {
     }
 
     if (!robots_allowed(&robots, url)) {
-      printf("Blocked by robots.txt: %s\n", url);
       free(url);
       continue;
     }
 
     visited_add(&visited, url);
 
-    printf("\nCrawling: %s\n", url);
+    printf("Crawling: %s\n", url);
 
     int current = graph_add_node(&graph, url);
 
     char *html = fetch_url(url);
 
-    if (!html) {
-      printf("Failed: %s\n", url);
+    if (!html)
       continue;
-    }
 
-    extract_links(html, &queue, &graph, current);
+    extract_links(html, &queue, &graph, current, domain);
 
     free(html);
   }
