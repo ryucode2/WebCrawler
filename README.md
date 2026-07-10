@@ -21,3 +21,14 @@ Build:
 
 ```bash
 make
+
+Run:
+./bin/crawler
+
+
+Project Structure:
+
+- src/       Source code
+- include/   Header files
+- build/     Build output
+- bin/       Executable
